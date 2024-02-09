@@ -3,6 +3,7 @@ pub mod rusty_vertex;
 
 use std::time::{Duration, Instant};
 use glium::{Surface, uniform};
+use glium::uniforms::UniformType;
 use rand::Rng;
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
@@ -13,6 +14,8 @@ pub struct Fly {
     pub body: Vec<Vertex>,
     pub speed: [f32; 2],
     pub pos: [f32; 2],
+    pub accumulation: f32,
+    pub glowing: bool,
 }
 
 impl Fly {
@@ -20,19 +23,21 @@ impl Fly {
         let mut rng = rand::thread_rng();
         let body: Vec<Vertex> = generate_circle(radius, complexity);
         let speed: [f32; 2] = [
-            rng.gen_range(0.000001..0.0023) * (if rng.gen_bool(0.5) { 1. } else { -1. }),
-            rng.gen_range(0.000001..0.0023) * (if rng.gen_bool(0.5) { 1. } else { -1. }),
+            rng.gen_range(0.0000001..0.00023) * (if rng.gen_bool(0.5) { 1. } else { -1. }),
+            rng.gen_range(0.0000001..0.00023) * (if rng.gen_bool(0.5) { 1. } else { -1. }),
         ];
         let pos: [f32; 2] = [
             rng.gen_range(-1.0..1.0),
             rng.gen_range(-1.0..1.0),
         ];
-
+        let accumulation = rng.gen_range(0.0..100.0);
 
         Fly {
             body,
             speed,
             pos,
+            accumulation,
+            glowing: false,
         }
     }
 }
@@ -43,10 +48,13 @@ fn main() {
     // ##################
 
     // flies settings
-    let scale = 0.1;
+    let scale = 0.05;
     let radius = 0.1;
     let complexity = 20;
-    let amount_of_flies = 1000;
+    let amount_of_flies = 2500;
+    let energy_charge: f32 = 1.;
+    let energy_discharge: f32 = 10.;
+    let max_range_of_neighbour = 1;
 
     // ################
     // Simulation Setup
@@ -61,20 +69,24 @@ fn main() {
     event_loop.set_control_flow(ControlFlow::Poll);
 
     let vertex_shader_src = r#"
-        in vec2 position;
-
         uniform mat4 matrix;
+        uniform vec3 color;
+
+        in vec2 position;
+        out vec3 vertex_color;
 
         void main() {
+            vertex_color = color;
             gl_Position = matrix * vec4(position, 0.0, 1.0);
         }
     "#;
 
     let fragment_shader_src = r#"
+        in vec3 vertex_color;
         out vec4 color;
 
         void main() {
-            color = vec4(255.0, 255.0, 0.0, 1.0);
+            color = vec4(vertex_color, 1.0);
         }
     "#;
 
@@ -88,6 +100,9 @@ fn main() {
         let fly = Fly::new(radius, complexity);
         flies.push(fly);
     }
+
+    let gray = (128.0/255.0, 128.0/255.0, 128.0/255.0f32);
+    let yellow = (255.0, 255.0, 0.0f32);
 
     let mut last_frame_time = Instant::now();
 
@@ -105,7 +120,7 @@ fn main() {
                 let elapsed_time = last_frame_time.elapsed();
                 last_frame_time = Instant::now();
 
-                let target_frame_time = Duration::from_millis(16);
+                let target_frame_time = Duration::from_millis(8);
                 if elapsed_time < target_frame_time {
                     std::thread::sleep(target_frame_time - elapsed_time);
                 }
@@ -123,34 +138,61 @@ fn main() {
                 // fills screen black
                 frame.clear_color(0.0, 0.0, 0.0, 1.0);
 
-                for i in &mut flies {
-                    let vertex_buffer = glium::VertexBuffer::new(&display, &i.body).unwrap();
+                for i in 0..flies.len() {
+                    let vertex_buffer = glium::VertexBuffer::new(&display, &flies[i].body).unwrap();
 
-                    i.pos[0] += i.speed[0];
+                    flies[i].pos[0] += flies[i].speed[0];
 
                     // Check for collisions with the window borders
-                    if i.pos[0] <= -1.0 + radius * scale {
-                        i.pos[0] = -1.0 + radius * scale;
+                    if flies[i].pos[0] <= -1.0 + radius * scale {
+                        flies[i].pos[0] = -1.0 + radius * scale;
                         // Reverse the x direction
-                        i.speed[0] *= -1.0;
-                    } else if i.pos[0] >= 1.0 - radius * scale {
-                        i.pos[0] = 1.0 - radius * scale;
+                        flies[i].speed[0] *= -1.0;
+                    } else if flies[i].pos[0] >= 1.0 - radius * scale {
+                        flies[i].pos[0] = 1.0 - radius * scale;
                         // Reverse the x direction
-                        i.speed[0] *= -1.0;
+                        flies[i].speed[0] *= -1.0;
                     }
 
                     // Update the position
-                    i.pos[1] += i.speed[1];
+                    flies[i].pos[1] += flies[i].speed[1];
 
                     // Check for collisions with the window borders
-                    if i.pos[1] <= -1.0 + radius * scale {
-                        i.pos[1] = -1.0 + radius * scale;
+                    if flies[i].pos[1] <= -1.0 + radius * scale {
+                        flies[i].pos[1] = -1.0 + radius * scale;
                         // Reverse the y direction
-                        i.speed[1] *= -1.0;
-                    } else if i.pos[1] >= 1.0 - radius * scale {
-                        i.pos[1] = 1.0 - radius * scale;
+                        flies[i].speed[1] *= -1.0;
+                    } else if flies[i].pos[1] >= 1.0 - radius * scale {
+                        flies[i].pos[1] = 1.0 - radius * scale;
                         // Reverse the y direction
-                        i.speed[1] *= -1.0;
+                        flies[i].speed[1] *= -1.0;
+                    }
+
+                    // flies glowing cycle based on their accumulation
+                    if flies[i].accumulation <= 500. && !flies[i].glowing {
+                        flies[i].accumulation += energy_charge;
+                        if flies[i].accumulation > 100. {
+                            flies[i].accumulation = 100.;
+                            flies[i].glowing = true;
+                            for j in 0..flies.len() {
+                                if i != j {
+                                    let distance = ((flies[i].pos[0] - flies[j].pos[0]).powi(2)
+                                        + (flies[i].pos[1] - flies[j].pos[1]).powi(2))
+                                        .sqrt();
+                                    // If the distance is within the specified radius, add 5 to accumulation
+                                    if distance <= 0.09 {
+                                        flies[j].accumulation += 5.0;
+                                    }
+                                }
+                            }
+
+                        }
+                    } else if flies[i].accumulation >= 0. && flies[i].glowing {
+                        flies[i].accumulation -= energy_discharge;
+                        if flies[i].accumulation < 0. {
+                            flies[i].accumulation = 0.;
+                            flies[i].glowing = false;
+                        }
                     }
 
                     let uniforms = uniform! {
@@ -158,9 +200,11 @@ fn main() {
                             [1.0 * scale, 0.0, 0.0, 0.0],
                             [0.0, 1.0 * scale, 0.0, 0.0],
                             [0.0, 0.0, 1.0 * scale, 0.0],
-                            [i.pos[0] , i.pos[1], 0.0, 1.0f32],
-                        ]
+                            [flies[i].pos[0] , flies[i].pos[1], 0.0, 1.0f32],
+                        ],
+                        color: (if !flies[i].glowing {gray} else {yellow}),
                     };
+
                     // draw flies
                     frame.draw(&vertex_buffer, &indices, &program, &uniforms, &Default::default()).unwrap();
                 }
