@@ -1,7 +1,10 @@
+mod circle;
+
 use glium::{implement_vertex, Surface, uniform};
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
+use crate::circle::generate_circle;
 
 #[derive(Copy, Clone)]
 struct Vertex {
@@ -19,25 +22,8 @@ fn main() {
         .build(&event_loop);
     event_loop.set_control_flow(ControlFlow::Poll);
 
-    let circle = [
-        Vertex { position: [1.0, 0.0] },
-        Vertex { position: [0.9239, 0.3827] },
-        Vertex { position: [0.7071, 0.7071] },
-        Vertex { position: [0.3827, 0.9239] },
-        Vertex { position: [0.0, 1.0] },
-        Vertex { position: [-0.3827, 0.9239] },
-        Vertex { position: [-0.7071, 0.7071] },
-        Vertex { position: [-0.9239, 0.3827] },
-        Vertex { position: [-1.0, 0.0] },
-        Vertex { position: [-0.9239, -0.3827] },
-        Vertex { position: [-0.7071, -0.7071] },
-        Vertex { position: [-0.3827, -0.9239] },
-        Vertex { position: [0.0, -1.0] },
-        Vertex { position: [0.3827, -0.9239] },
-        Vertex { position: [0.7071, -0.7071] },
-        Vertex { position: [0.9239, -0.3827] },
+    let circle = generate_circle(0.5, 20);
 
-    ];
     let vertex_buffer = glium::VertexBuffer::new(&display, &circle).unwrap();
     let indices = glium::index::NoIndices(glium::index::PrimitiveType::TriangleFan);
 
