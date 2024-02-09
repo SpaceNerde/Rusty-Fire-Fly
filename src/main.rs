@@ -1,5 +1,6 @@
 mod circle;
 
+use std::time::{Duration, Instant};
 use glium::{implement_vertex, Surface, uniform};
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::{Event, WindowEvent};
@@ -23,7 +24,7 @@ fn main() {
     event_loop.set_control_flow(ControlFlow::Poll);
 
     let scale = 0.1;
-    let radius = 0.5;
+    let radius = 0.25;
     let circle = generate_circle(radius, 20);
 
     let vertex_buffer = glium::VertexBuffer::new(&display, &circle).unwrap();
@@ -49,10 +50,11 @@ fn main() {
 
     let program = glium::Program::from_source(&display, vertex_shader_src, fragment_shader_src, None).unwrap();
 
-    let window_size = window.inner_size();
     let mut x_offset: f32 = 0.0;
     let mut y_offset: f32 = 0.0;
-    let mut speed: Vec<f32> = vec![0.0002, 0.0001];
+    let mut speed: Vec<f32> = vec![0.02, 0.01];
+
+    let mut last_frame_time = Instant::now();
 
     event_loop.run(move |event, elwt| {
         match event {
@@ -64,6 +66,16 @@ fn main() {
                 elwt.exit();
             },
             Event::AboutToWait => {
+                // limit the program to 60 fps
+                let elapsed_time = last_frame_time.elapsed();
+                last_frame_time = Instant::now();
+
+                let target_frame_time = Duration::from_millis(16);
+                if elapsed_time < target_frame_time {
+                    std::thread::sleep(target_frame_time - elapsed_time);
+                }
+
+                // request redraw
                 window.request_redraw();
             },
             Event::WindowEvent {
@@ -97,21 +109,6 @@ fn main() {
                     // Reverse the y direction
                     speed[1] *= -1.0;
                 }
-
-                /*
-                if x_offset <= (-1. + (radius * scale)) {
-                    speed *= -1.;
-                }
-                if x_offset <= (1. - (radius * scale)) {
-                    speed *= -1.;
-                }
-                if y_offset <= (-1. + (radius * scale)) {
-                    speed *= -1.;
-                }
-                if y_offset <= (1. - (radius * scale)) {
-                    speed *= -1.;
-                }
-                 */
 
                 let uniforms = uniform! {
                     matrix: [
