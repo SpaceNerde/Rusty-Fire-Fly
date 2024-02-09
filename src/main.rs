@@ -22,7 +22,9 @@ fn main() {
         .build(&event_loop);
     event_loop.set_control_flow(ControlFlow::Poll);
 
-    let circle = generate_circle(0.5, 20);
+    let scale = 0.1;
+    let radius = 0.5;
+    let circle = generate_circle(radius, 20);
 
     let vertex_buffer = glium::VertexBuffer::new(&display, &circle).unwrap();
     let indices = glium::index::NoIndices(glium::index::PrimitiveType::TriangleFan);
@@ -47,7 +49,10 @@ fn main() {
 
     let program = glium::Program::from_source(&display, vertex_shader_src, fragment_shader_src, None).unwrap();
 
-    let mut t: f32 = 0.0;
+    let window_size = window.inner_size();
+    let mut x_offset: f32 = 0.0;
+    let mut y_offset: f32 = 0.0;
+    let mut speed: Vec<f32> = vec![0.0002, 0.0001];
 
     event_loop.run(move |event, elwt| {
         match event {
@@ -66,15 +71,54 @@ fn main() {
                 ..
             } => {
                 // Simulation Logic
-                t += 0.0002;
-                let offset = t.sin() * 0.5;
+                x_offset += speed[0];
+
+                // Check for collisions with the window borders
+                if x_offset <= -1.0 + radius * scale {
+                    x_offset = -1.0 + radius * scale;
+                    // Reverse the x direction
+                    speed[0] *= -1.0;
+                } else if x_offset >= 1.0 - radius * scale {
+                    x_offset = 1.0 - radius * scale;
+                    // Reverse the x direction
+                    speed[0] *= -1.0;
+                }
+
+                // Update the position
+                y_offset += speed[1];
+
+                // Check for collisions with the window borders
+                if y_offset <= -1.0 + radius * scale {
+                    y_offset = -1.0 + radius * scale;
+                    // Reverse the y direction
+                    speed[1] *= -1.0;
+                } else if y_offset >= 1.0 - radius * scale {
+                    y_offset = 1.0 - radius * scale;
+                    // Reverse the y direction
+                    speed[1] *= -1.0;
+                }
+
+                /*
+                if x_offset <= (-1. + (radius * scale)) {
+                    speed *= -1.;
+                }
+                if x_offset <= (1. - (radius * scale)) {
+                    speed *= -1.;
+                }
+                if y_offset <= (-1. + (radius * scale)) {
+                    speed *= -1.;
+                }
+                if y_offset <= (1. - (radius * scale)) {
+                    speed *= -1.;
+                }
+                 */
 
                 let uniforms = uniform! {
                     matrix: [
-                        [0.1, 0.0, 0.0, 0.0],
-                        [0.0, 0.1, 0.0, 0.0],
-                        [0.0, 0.0, 0.1, 0.0],
-                        [offset , 0.0, 0.0, 1.0f32],
+                        [1.0 * scale, 0.0, 0.0, 0.0],
+                        [0.0, 1.0 * scale, 0.0, 0.0],
+                        [0.0, 0.0, 1.0 * scale, 0.0],
+                        [x_offset , y_offset, 0.0, 1.0f32],
                     ]
                 };
 
