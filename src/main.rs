@@ -1,20 +1,56 @@
 mod circle;
+pub mod rusty_vertex;
 
 use std::time::{Duration, Instant};
 use glium::{implement_vertex, Surface, uniform};
+use rand::Rng;
 use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use crate::circle::generate_circle;
+use crate::rusty_vertex::Vertex;
 
-#[derive(Copy, Clone)]
-struct Vertex {
-    position: [f32; 2],
+pub struct Fly {
+    body: Vec<Vertex>,
+    pub speed: [f32; 2],
+    pub pos: [f32; 2]
 }
 
-implement_vertex!(Vertex, position);
+impl Fly {
+    fn new(radius: f32, complexity: i32) -> Self{
+        let mut rng = rand::thread_rng();
+        let body: Vec<Vertex> = generate_circle(radius, complexity);
+        let speed: [f32; 2] = [
+            0.002 * (if rng.gen_bool(0.5) { 1. } else { -1. }),
+            0.002 * (if rng.gen_bool(0.5) { 1. } else { -1. })
+        ];
+        let pos: [f32; 2] = [
+            rng.gen_range(-1.0..1.0),
+            rng.gen_range(-1.0..1.0),
+        ];
+
+        Fly {
+            body,
+            speed,
+            pos,
+        }
+    }
+}
 
 fn main() {
+    // ##################
+    // Simulation Setting
+    // ##################
+
+    // flies settings
+    let scale = 0.1;
+    let radius = 0.25;
+    let complexity = 20;
+
+    // ################
+    // Simulation Setup
+    // ################
+
     // init event loop
     let event_loop = EventLoop::new().unwrap();
     // init window
@@ -23,8 +59,6 @@ fn main() {
         .build(&event_loop);
     event_loop.set_control_flow(ControlFlow::Poll);
 
-    let scale = 0.1;
-    let radius = 0.25;
     let circle = generate_circle(radius, 20);
 
     let vertex_buffer = glium::VertexBuffer::new(&display, &circle).unwrap();
@@ -50,9 +84,8 @@ fn main() {
 
     let program = glium::Program::from_source(&display, vertex_shader_src, fragment_shader_src, None).unwrap();
 
-    let mut x_offset: f32 = 0.0;
-    let mut y_offset: f32 = 0.0;
-    let mut speed: Vec<f32> = vec![0.02, 0.01];
+    // create a fly
+    let mut fly = Fly::new(radius, complexity);
 
     let mut last_frame_time = Instant::now();
 
@@ -83,31 +116,31 @@ fn main() {
                 ..
             } => {
                 // Simulation Logic
-                x_offset += speed[0];
+                fly.pos[0] += fly.speed[0];
 
                 // Check for collisions with the window borders
-                if x_offset <= -1.0 + radius * scale {
-                    x_offset = -1.0 + radius * scale;
+                if fly.pos[0] <= -1.0 + radius * scale {
+                    fly.pos[0] = -1.0 + radius * scale;
                     // Reverse the x direction
-                    speed[0] *= -1.0;
-                } else if x_offset >= 1.0 - radius * scale {
-                    x_offset = 1.0 - radius * scale;
+                    fly.speed[0] *= -1.0;
+                } else if fly.pos[0] >= 1.0 - radius * scale {
+                    fly.pos[0] = 1.0 - radius * scale;
                     // Reverse the x direction
-                    speed[0] *= -1.0;
+                    fly.speed[0] *= -1.0;
                 }
 
                 // Update the position
-                y_offset += speed[1];
+                fly.pos[1] += fly.speed[1];
 
                 // Check for collisions with the window borders
-                if y_offset <= -1.0 + radius * scale {
-                    y_offset = -1.0 + radius * scale;
+                if fly.pos[1] <= -1.0 + radius * scale {
+                    fly.pos[1] = -1.0 + radius * scale;
                     // Reverse the y direction
-                    speed[1] *= -1.0;
-                } else if y_offset >= 1.0 - radius * scale {
-                    y_offset = 1.0 - radius * scale;
+                    fly.speed[1] *= -1.0;
+                } else if fly.pos[1] >= 1.0 - radius * scale {
+                    fly.pos[1] = 1.0 - radius * scale;
                     // Reverse the y direction
-                    speed[1] *= -1.0;
+                    fly.speed[1] *= -1.0;
                 }
 
                 let uniforms = uniform! {
@@ -115,7 +148,7 @@ fn main() {
                         [1.0 * scale, 0.0, 0.0, 0.0],
                         [0.0, 1.0 * scale, 0.0, 0.0],
                         [0.0, 0.0, 1.0 * scale, 0.0],
-                        [x_offset , y_offset, 0.0, 1.0f32],
+                        [fly.pos[0] , fly.pos[1], 0.0, 1.0f32],
                     ]
                 };
 

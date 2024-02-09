@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 winit = "0.29.10"
 glium = "0.34.0"
+rand = "0.8.5"

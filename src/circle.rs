@@ -1,12 +1,6 @@
 use std::f32::consts::PI;
 use glium::implement_vertex;
-
-#[derive(Copy, Clone)]
-pub struct Vertex {
-    position: [f32; 2],
-}
-
-implement_vertex!(Vertex, position);
+use crate::rusty_vertex::Vertex;
 
 pub fn generate_circle(r: f32, n: i32) -> Vec<Vertex>{
     let mut circle = vec![];
