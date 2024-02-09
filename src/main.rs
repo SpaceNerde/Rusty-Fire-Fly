@@ -2,12 +2,8 @@ mod circle;
 pub mod rusty_vertex;
 
 use std::time::{Duration, Instant};
-use glium::{implement_vertex, Surface, uniform, VertexBuffer};
-use glium::glutin::display::Display;
-use glium::glutin::surface::WindowSurface;
-use glium::index::NoIndices;
+use glium::{Surface, uniform};
 use rand::Rng;
-use winit::dpi::{LogicalSize, PhysicalSize};
 use winit::event::{Event, WindowEvent};
 use winit::event_loop::{ControlFlow, EventLoop};
 use crate::circle::generate_circle;
@@ -24,8 +20,8 @@ impl Fly {
         let mut rng = rand::thread_rng();
         let body: Vec<Vertex> = generate_circle(radius, complexity);
         let speed: [f32; 2] = [
-            0.002 * (if rng.gen_bool(0.5) { 1. } else { -1. }),
-            0.002 * (if rng.gen_bool(0.5) { 1. } else { -1. }),
+            rng.gen_range(0.000001..0.0023) * (if rng.gen_bool(0.5) { 1. } else { -1. }),
+            rng.gen_range(0.000001..0.0023) * (if rng.gen_bool(0.5) { 1. } else { -1. }),
         ];
         let pos: [f32; 2] = [
             rng.gen_range(-1.0..1.0),
@@ -48,9 +44,9 @@ fn main() {
 
     // flies settings
     let scale = 0.1;
-    let radius = 0.25;
+    let radius = 0.1;
     let complexity = 20;
-    let amount_of_flies = 10;
+    let amount_of_flies = 1000;
 
     // ################
     // Simulation Setup
@@ -78,7 +74,7 @@ fn main() {
         out vec4 color;
 
         void main() {
-            color = vec4(1.0, 0.0, 0.0, 1.0);
+            color = vec4(255.0, 255.0, 0.0, 1.0);
         }
     "#;
 
@@ -127,7 +123,7 @@ fn main() {
                 // fills screen black
                 frame.clear_color(0.0, 0.0, 0.0, 1.0);
 
-                for mut i in &mut flies {
+                for i in &mut flies {
                     let vertex_buffer = glium::VertexBuffer::new(&display, &i.body).unwrap();
 
                     i.pos[0] += i.speed[0];
